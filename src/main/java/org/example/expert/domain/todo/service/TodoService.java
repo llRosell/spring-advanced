@@ -43,9 +43,9 @@ public class TodoService {
 
     public Page<TodoResponse> getTodos(int page, int size) {
         Pageable pageable = PageRequest.of(page - 1, size);
-        Page<Todo> todos = todoRepository.findAllByOrderByModifiedAtDesc(pageable);
+        Page<Todo> todos = todoRepository.findAll(pageable); // @EntityGraph와 함께 기본 메서드 사용
 
-        return todos.map(TodoResponse::from); // 정적 메서드를 사용하여 변환
+        return todos.map(TodoResponse::from);
     }
 
     public TodoResponse getTodo(long todoId) {
