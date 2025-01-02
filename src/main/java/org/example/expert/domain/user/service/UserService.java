@@ -19,29 +19,45 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
 
     public UserResponse findUserById(long userId) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new InvalidRequestException("User not found"));
+        User user = findUserByIdOrThrow(userId);
         return new UserResponse(user.getId(), user.getEmail());
     }
 
     @Transactional
     public void changePassword(long userId, UserPasswordChangeRequest userPasswordChangeRequest) {
-        if (userPasswordChangeRequest.getNewPassword().length() < 8 ||
-                !userPasswordChangeRequest.getNewPassword().matches(".*\\d.*") ||
-                !userPasswordChangeRequest.getNewPassword().matches(".*[A-Z].*")) {
-            throw new InvalidRequestException("새 비밀번호는 8자 이상이어야 하고, 숫자와 대문자를 포함해야 합니다.");
-        }
+        validateNewPassword(userPasswordChangeRequest.getNewPassword());
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new InvalidRequestException("User not found"));
+        User user = findUserByIdOrThrow(userId);
 
-        if (passwordEncoder.matches(userPasswordChangeRequest.getNewPassword(), user.getPassword())) {
-            throw new InvalidRequestException("새 비밀번호는 기존 비밀번호와 같을 수 없습니다.");
-        }
-
-        if (!passwordEncoder.matches(userPasswordChangeRequest.getOldPassword(), user.getPassword())) {
-            throw new InvalidRequestException("잘못된 비밀번호입니다.");
-        }
+        validateOldPassword(userPasswordChangeRequest.getOldPassword(), user.getPassword());
+        validateNewPasswordAgainstOld(userPasswordChangeRequest.getNewPassword(), user.getPassword());
 
         user.changePassword(passwordEncoder.encode(userPasswordChangeRequest.getNewPassword()));
+    }
+
+    // 유틸리티 메서드들
+    private User findUserByIdOrThrow(long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new InvalidRequestException("User not found"));
+    }
+
+    private void validateOldPassword(String oldPassword, String currentPassword) {
+        if (!passwordEncoder.matches(oldPassword, currentPassword)) {
+            throw new InvalidRequestException("잘못된 비밀번호입니다.");
+        }
+    }
+
+    private void validateNewPassword(String newPassword) {
+        if (newPassword.length() < 8 ||
+                !newPassword.matches(".*\\d.*") ||
+                !newPassword.matches(".*[A-Z].*")) {
+            throw new InvalidRequestException("새 비밀번호는 8자 이상이어야 하고, 숫자와 대문자를 포함해야 합니다.");
+        }
+    }
+
+    private void validateNewPasswordAgainstOld(String newPassword, String currentPassword) {
+        if (passwordEncoder.matches(newPassword, currentPassword)) {
+            throw new InvalidRequestException("새 비밀번호는 기존 비밀번호와 같을 수 없습니다.");
+        }
     }
 }

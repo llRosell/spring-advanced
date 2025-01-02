@@ -30,21 +30,12 @@ public class ManagerService {
 
     @Transactional
     public ManagerSaveResponse saveManager(AuthUser authUser, long todoId, ManagerSaveRequest managerSaveRequest) {
-        // 일정을 만든 유저
         User user = User.fromAuthUser(authUser);
-        Todo todo = todoRepository.findById(todoId)
-                .orElseThrow(() -> new InvalidRequestException("Todo not found"));
+        Todo todo = findTodoById(todoId);
+        validateUserPermission(user, todo);
 
-        if (!ObjectUtils.nullSafeEquals(user.getId(), todo.getUser().getId())) {
-            throw new InvalidRequestException("담당자를 등록하려고 하는 유저가 일정을 만든 유저가 유효하지 않습니다.");
-        }
-
-        User managerUser = userRepository.findById(managerSaveRequest.getManagerUserId())
-                .orElseThrow(() -> new InvalidRequestException("등록하려고 하는 담당자 유저가 존재하지 않습니다."));
-
-        if (ObjectUtils.nullSafeEquals(user.getId(), managerUser.getId())) {
-            throw new InvalidRequestException("일정 작성자는 본인을 담당자로 등록할 수 없습니다.");
-        }
+        User managerUser = findUserById(managerSaveRequest.getManagerUserId());
+        validateSelfAssignment(user, managerUser);
 
         Manager newManagerUser = new Manager(managerUser, todo);
         Manager savedManagerUser = managerRepository.save(newManagerUser);
@@ -56,9 +47,7 @@ public class ManagerService {
     }
 
     public List<ManagerResponse> getManagers(long todoId) {
-        Todo todo = todoRepository.findById(todoId)
-                .orElseThrow(() -> new InvalidRequestException("Todo not found"));
-
+        Todo todo = findTodoById(todoId);
         List<Manager> managerList = managerRepository.findAllByTodoId(todo.getId());
 
         List<ManagerResponse> dtoList = new ArrayList<>();
@@ -74,23 +63,47 @@ public class ManagerService {
 
     @Transactional
     public void deleteManager(long userId, long todoId, long managerId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new InvalidRequestException("User not found"));
+        User user = findUserById(userId);
+        Todo todo = findTodoById(todoId);
+        validateUserPermission(user, todo);
 
-        Todo todo = todoRepository.findById(todoId)
+        Manager manager = findManagerById(managerId);
+        validateManagerTodoAssociation(manager, todo);
+
+        managerRepository.delete(manager);
+    }
+
+    // 유틸리티 메서드들
+    private Todo findTodoById(long todoId) {
+        return todoRepository.findById(todoId)
                 .orElseThrow(() -> new InvalidRequestException("Todo not found"));
+    }
 
-        if (todo.getUser() == null || !ObjectUtils.nullSafeEquals(user.getId(), todo.getUser().getId())) {
-            throw new InvalidRequestException("해당 일정을 만든 유저가 유효하지 않습니다.");
-        }
+    private User findUserById(long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new InvalidRequestException("User not found"));
+    }
 
-        Manager manager = managerRepository.findById(managerId)
+    private Manager findManagerById(long managerId) {
+        return managerRepository.findById(managerId)
                 .orElseThrow(() -> new InvalidRequestException("Manager not found"));
+    }
 
+    private void validateUserPermission(User user, Todo todo) {
+        if (!ObjectUtils.nullSafeEquals(user.getId(), todo.getUser().getId())) {
+            throw new InvalidRequestException("담당자를 등록하려고 하는 유저가 일정을 만든 유저가 유효하지 않습니다.");
+        }
+    }
+
+    private void validateSelfAssignment(User user, User managerUser) {
+        if (ObjectUtils.nullSafeEquals(user.getId(), managerUser.getId())) {
+            throw new InvalidRequestException("일정 작성자는 본인을 담당자로 등록할 수 없습니다.");
+        }
+    }
+
+    private void validateManagerTodoAssociation(Manager manager, Todo todo) {
         if (!ObjectUtils.nullSafeEquals(todo.getId(), manager.getTodo().getId())) {
             throw new InvalidRequestException("해당 일정에 등록된 담당자가 아닙니다.");
         }
-
-        managerRepository.delete(manager);
     }
 }
