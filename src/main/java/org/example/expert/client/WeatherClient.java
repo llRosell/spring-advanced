@@ -29,10 +29,11 @@ public class WeatherClient {
         WeatherDto[] weatherArray = responseEntity.getBody();
         if (!HttpStatus.OK.equals(responseEntity.getStatusCode())) {
             throw new ServerException("날씨 데이터를 가져오는데 실패했습니다. 상태 코드: " + responseEntity.getStatusCode());
-        } else {
-            if (weatherArray == null || weatherArray.length == 0) {
-                throw new ServerException("날씨 데이터가 없습니다.");
-            }
+        }
+
+        // 불필요한 else 블록을 없애 코드를 간결하게 수정함.
+        if (weatherArray == null || weatherArray.length == 0) {
+           throw new ServerException("날씨 데이터가 없습니다.");
         }
 
         String today = getCurrentDate();
